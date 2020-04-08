@@ -1,0 +1,11 @@
+**/*.log
+.idea/
+__pycache__/
+*.pyc
+.pytest_cache/
+dist/
+bin/**
+build/
+/*.egg-info
+/*.egg
+test*
