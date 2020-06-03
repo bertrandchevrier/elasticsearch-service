@@ -1,6 +1,6 @@
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch,RequestsHttpConnection
 from elasticsearch import helpers
-
+import ssl
 from elasticsearch_dsl import Search, Index
 import json
 import logging
@@ -36,7 +36,7 @@ class ElasticsearchService:
         self.port=port
         user=kwargs.get('http_auth_username')
         passwd=kwargs.get('http_auth_password')
-        with_authent = (kwargs.get('http_auth_username')!= None) and (kwargs.get('http_auth_password')!= None)
+        with_authent = (user!= None) and (passwd!= None)
         if kwargs.get('doc_type'):
             self.doc_type = kwargs.get('doc_type')
         else:
@@ -44,11 +44,17 @@ class ElasticsearchService:
         if (with_authent): # ajout parametre extra (authent http basic)
             self._logger.info("log with auth")
             self.scheme=kwargs.get('scheme')
-            self.http_auth_username=kwargs.get('user')
-            self.http_auth_password=kwargs.get('passwd')
-            self.es = Elasticsearch(hosts=[self.host], port=self.port
-                                    ,http_auth = (self.http_auth_username,
-                                     self.http_auth_password),
+            if self.scheme=='https':
+                self.es = Elasticsearch(hosts=[self.host], port=self.port
+                                    ,http_auth = (user,
+                                     passwd),
+                                    verify_certs=False,
+                                    connection_class=RequestsHttpConnection,
+                                    scheme=self.scheme)
+            else:
+                self.es = Elasticsearch(hosts=[self.host], port=self.port
+                                    ,http_auth = (user,
+                                     passwd),
                                     scheme=self.scheme)
         else:
             self.es = Elasticsearch(hosts=[self.host], port=self.port)

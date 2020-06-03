@@ -15,11 +15,12 @@ To use , simply do::
 With no authentification define your host(default='localhost' and  port (default=9200)::
 
     elk_service=ElasticsearchService() # default localhost and port 9200
+        OR (ONLY FOR URL DIFFERENT Of localhost AND PORT IS NOT 9200   
     elk_service=ElasticsearchService('myurl',9201)
 
 With HTTP basic authentification host, port and additional informations::
 
-    elk_service=ElasticsearchService('localhost',9200,scheme = 'http',http_auth_username : 'myuser',http_auth_password:'mypassword'})
+    elk_service=ElasticsearchService('localhost',9200,scheme = 'http',http_auth_username = 'myuser',http_auth_password='mypassword')
 
 ##To import objects in ELK use :
 

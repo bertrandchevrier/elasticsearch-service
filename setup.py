@@ -5,7 +5,7 @@ with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setup(name='elasticsearch-service',
-      version='0.15',
+      version='0.18',
       description='easy access to elastic based on elasticsearch-dsl',
       url='http://github.com',
       author='The data handyman team',
