@@ -9,7 +9,7 @@ build/
 /*.egg-info
 /*.egg
 test*
-venv/
+venv/*
 *.csv
 *.json
 Test*.py
