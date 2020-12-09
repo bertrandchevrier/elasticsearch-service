@@ -5,11 +5,11 @@ with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setup(name='elasticsearch-service',
-      version='0.18',
+      version='0.20',
       description='easy access to elastic based on elasticsearch-dsl',
-      url='http://github.com',
+      url='https://github.com/bertrandchevrier/elasticsearch-service.git',
       author='The data handyman team',
-      author_email='bertrand.chevrier@orange.com',
+      author_email='chevrierbertrand@yahoo.fr',
       license='MIT',
       classifiers=['Development Status :: 3 - Alpha'],
       long_description=long_description,

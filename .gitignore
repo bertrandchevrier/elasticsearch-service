@@ -10,3 +10,6 @@ build/
 /*.egg
 test*
 env/
+*.csv
+*.json
+Test*.py
