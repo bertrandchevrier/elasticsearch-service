@@ -1,10 +1,11 @@
-from elasticsearch import Elasticsearch,RequestsHttpConnection
-from elasticsearch import helpers
-import ssl
-from elasticsearch_dsl import Search, Index
 import json
 import logging
 import pandas as pd
+
+from elasticsearch import Elasticsearch, RequestsHttpConnection
+from elasticsearch import helpers
+from elasticsearch_dsl import Search, Index
+
 
 class ElasticsearchService:
     """
@@ -14,8 +15,6 @@ class ElasticsearchService:
     # Logging
     _FORMAT = '%(asctime)s - %(levelname)s - %(name)s - %(message)s'
     _logger = None
-
-
 
     def __init__(self, host='localhost', port=9200, **kwargs):
         """
@@ -32,30 +31,32 @@ class ElasticsearchService:
         self._logger = logging.getLogger(__name__)
         logging.getLogger(__name__).setLevel(logging.INFO)
 
-        self.host=host
-        self.port=port
-        user=kwargs.get('http_auth_username')
-        passwd=kwargs.get('http_auth_password')
-        with_authent = (user!= None) and (passwd!= None)
+        self.host = host
+        self.port = port
+        user = kwargs.get('http_auth_username')
+        passwd = kwargs.get('http_auth_password')
+        api_key = kwargs.get('api_key')
+        with_authent = (user is not None) and (passwd is not None)
+        with_api_key = (api_key is not None)
         if kwargs.get('doc_type'):
             self.doc_type = kwargs.get('doc_type')
         else:
             self.doc_type = '_doc'
-        if (with_authent): # ajout parametre extra (authent http basic)
+        if (with_authent):  # ajout parametre extra (authent http basic)
             self._logger.info("log with auth")
-            self.scheme=kwargs.get('scheme')
-            if self.scheme=='https':
-                self.es = Elasticsearch(hosts=[self.host], port=self.port
-                                    ,http_auth = (user,
-                                     passwd),
-                                    verify_certs=False,
-                                    connection_class=RequestsHttpConnection,
-                                    scheme=self.scheme)
+            self.scheme = kwargs.get('scheme')
+            if self.scheme == 'https':
+                self.es = Elasticsearch(hosts=[self.host], port=self.port,
+                                        http_auth=(user, passwd),
+                                        verify_certs=False,
+                                        connection_class=RequestsHttpConnection,
+                                        scheme=self.scheme)
             else:
-                self.es = Elasticsearch(hosts=[self.host], port=self.port
-                                    ,http_auth = (user,
-                                     passwd),
-                                    scheme=self.scheme)
+                self.es = Elasticsearch(hosts=[self.host], port=self.port,
+                                        http_auth=(user, passwd),
+                                        scheme=self.scheme)
+        elif with_api_key:
+            self.es = Elasticsearch(hosts=[self.host], port=self.port, api_key=api_key)
         else:
             self.es = Elasticsearch(hosts=[self.host], port=self.port)
 
@@ -64,7 +65,7 @@ class ElasticsearchService:
 
     def getClient(self):
         return self.es
-    
+
     def setDoc_type(self, doc_type):
         self.doc_type = doc_type
 
@@ -85,7 +86,6 @@ class ElasticsearchService:
         :param **kwargs: extra parameters (eg: timeout)
         """
         self.es.indices.put_mapping(index=index, body=mapping_body)
-    
 
     def _build_search(self, index, **kwargs):
         """
@@ -241,7 +241,7 @@ class ElasticsearchService:
             response = helpers.bulk(self.es, documents, index=index, doc_type=self.doc_type, pipeline=pipeline_name)
         else:
             response = helpers.bulk(self.es, documents, index=index, doc_type=self.doc_type)
-        
+
         # It returns a tuple with summary information - 
         # number of successfully executed actions and either list of errors or number of errors if stats_only is set to True.
         return response
@@ -272,8 +272,3 @@ class ElasticsearchService:
 
     def delete_index(self,index_to_delete):
         self.es.indices.delete(index=index_to_delete, ignore=[400, 404])
-
-
-
-
-
