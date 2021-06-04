@@ -94,78 +94,79 @@ class ElasticsearchService:
         :param kwargs: see getDocumentsCount and getDocuments
         :return:
         """
-        timeRanged = False #is the query based on a time range ?
-        filtered = False # is the query filtered ?
-        ranged = False # has the query ranges?
-        excluded=False # has must not
-        field_to_include=False # has only specific field to include
-        wildcard=False
-
-        if kwargs.get('startdate'):
-            timeRanged = True
+        startdate = kwargs.get('startdate', None)
+        if startdate:
             timefield = kwargs.get('timefield')
-            startdate = kwargs.get('startdate')
-            if kwargs.get('enddate'):
-                enddate = kwargs.get('enddate')
-            else:
-                enddate = 'now'
-        if kwargs.get('filters'):
-            filtered = True
-            filters = kwargs.get('filters')
-        if kwargs.get('exclude'):
-            excluded = True
-            exclude = kwargs.get('exclude')
-        if kwargs.get('ranges'):
-            ranged = True
-            ranges = kwargs.get('ranges')
-        if kwargs.get('field_to_include'):
-            field_to_include = True
-            fields_to_include = kwargs.get('field_to_include')
-        if kwargs.get('wildcard'):
-            wildcard=True
-            wildcards=kwargs.get('wildcard')
+            enddate = kwargs.get('enddate', 'now')
+        filters = kwargs.get('filters', None)
+        exclude = kwargs.get('exclude', None)
+        ranges = kwargs.get('ranges', None)
+        fields_to_include = kwargs.get('field_to_include', None)
+        wildcards = kwargs.get('wildcard', None)
+        start_from = kwargs.get('from_', None)
+        size = kwargs.get('size', None)
+        sort_ = kwargs.get('sort', None)
 
-        search = Search(using=self.es, index=index, doc_type=self.doc_type).params(request_timeout=2000)
+        search = Search(using=self.es, index=index, doc_type=self.doc_type)\
+            .params(request_timeout=2000)
 
-        if wildcard:
-            for wild in wildcards:
-                search = search.filter('wildcard', **{wild: wildcards[wild]})
-        if excluded:
-            for ex in exclude.keys():
-                search=search.exclude('terms',**{ex: exclude[ex]})
-        if timeRanged:
+        if startdate:
             if startdate != enddate:
-                timeRange = {timefield:{'gte': startdate, 'lt': enddate}}
+                timeRange = {timefield: {'gte': startdate, 'lt': enddate}}
             else:
-                timeRange = {timefield:{'gte': startdate, 'lte': enddate}}
+                timeRange = {timefield: {'gte': startdate, 'lte': enddate}}
             search = search.filter('range', **timeRange)
-        if ranged:
-            # ranges are expected in format : [{field:{'gte':value, 'lte':value}}, {field:{'gte':value}}, {field:{'lte':value}}]
+        if filters:
+            for key, val in filters.items():
+                search = search.filter('terms' if isinstance(val, list) else 'term', **{key: val})
+        if exclude:
+            for ex in exclude.keys():
+                search = search.exclude('terms', **{ex: exclude[ex]})
+        if ranges:
+            # ranges are expected in format:
+            # [{field:{'gte':value, 'lte':value}}, {field: {'gte': value}}, {field: {'lte': value}}]
             for range_filter in ranges:
                 search = search.filter('range', **range_filter)
-        if filtered:
-            for key in filters.keys():
-                search = search.filter('terms', **{key: filters[key]})
-        if field_to_include:
+        if fields_to_include:
             for field in fields_to_include.keys():
-                search=search.source( **{field: fields_to_include[field]})
+                search = search.source(**{field: fields_to_include[field]})
+        if wildcards:
+            for wild in wildcards:
+                search = search.filter('wildcard', **{wild: wildcards[wild]})
+        if start_from:
+            search = search.extra(**{"from_": start_from})
+        if size:
+            search = search.extra(**{"size": size})
+        if sort_:
+            search = search.sort(*sort_)
 
         self._logger.info(json.dumps(search.to_dict()))
 
         return search
-
 
     def get_documents_count(self, index, **kwargs):
         """
         Returns document count in the index according to options
         :param index: index for search
         :param kwargs:
-        startdate, timefield, endate : for time ranges, only documents with a date greater than equal to startdate and strictly lower than enddate according to timefield will be requested.
-         If startdate is equal to enddate, document from startdate will be requested. Date format is expected to be compliant with elasticsearch (eg 'YYYY-MM-dd')
-        ranges : if there is a filter accoring to a numerical field value. Ranges are expected in format : [{field:{'gte':value, 'lte':value}}, {field:{'gte':value}}, {field:{'lte':value}}]
-        filters : disctionnary with all fields to use for filtering with their expected values in an array : {field:[value1, value2], field2:[value1]}.
+        startdate, timefield, endate:
+            for time ranges, only documents with a date greater than equal to startdate and strictly
+            lower than enddate according to timefield will be requested.
+            If startdate is equal to enddate, document from startdate will be requested.
+            Date format is expected to be compliant with elasticsearch (eg 'YYYY-MM-dd')
+        filters:
+            dictionary with all fields to use for filtering with their expected values in an array:
+                {field: [value1, value2], field2: value1}.
+        exclude:
+            same as filters, but used to exclude documents.
+        ranges:
+            if there is a filter accoring to a numerical field value.
+            Ranges are expected in format:
+            [{field:{'gte':value, 'lte':value}}, {field:{'gte':value}}, {field:{'lte':value}}]
+        wildcards:
+            like filters, but used with * as wildcard
         :return:
-        number of document in index matching constraints.
+        number of documents in index matching constraints.
         """
         return self._build_search(index, **kwargs).count()
 
@@ -174,10 +175,30 @@ class ElasticsearchService:
         Returns document  in the index according to options
         :param index: index for search
         :param kwargs:
-        startdate, timefield, endate : for time ranges, only documents with a date greater than equal to startdate and strictly lower than enddate according to timefield will be requested.
-         If startdate is equal to enddate, document from startdate will be requested. Date format is expected to be compliant with elasticsearch (eg 'YYYY-MM-dd')
-        ranges : if there is a filter accoring to a numerical field value. Ranges are expected in format : [{field:{'gte':value, 'lte':value}}, {field:{'gte':value}}, {field:{'lte':value}}]
-        filters : disctionnary with all fields to use for filtering with their expected values in an array : {field:[value1, value2], field2:[value1]}.
+        startdate, timefield, endate:
+            for time ranges, only documents with a date greater than equal to startdate and strictly
+            lower than enddate according to timefield will be requested.
+            If startdate is equal to enddate, document from startdate will be requested.
+            Date format is expected to be compliant with elasticsearch (eg 'YYYY-MM-dd')
+        filters:
+            dictionary with all fields to use for filtering with their expected values in an array:
+                {field: [value1, value2], field2: value1}.
+        exclude:
+            same as filters, but used to exclude documents.
+        ranges:
+            if there is a filter accoring to a numerical field value.
+            Ranges are expected in format:
+            [{field:{'gte':value, 'lte':value}}, {field:{'gte':value}}, {field:{'lte':value}}]
+        fields_to_include:
+            Limit the returned documents to the fields in this list.
+        wildcards:
+            like filters, but used with * as wildcard
+        from_, size:
+            Can be used for pagination. If given, a list of documents with lenght 'size' will be
+            returned, starting from the 'from_'th document.
+        sort_:
+            A list of fields used to sort the returned documents, with or without a specified order:
+            [{"post_date": {"order": "asc"}}, "user", {"name": "desc"}, {"age": "desc"}]
         :return:
         document in index matching constraints as returned by elasticsearch-dsl package (Hits)
         """
