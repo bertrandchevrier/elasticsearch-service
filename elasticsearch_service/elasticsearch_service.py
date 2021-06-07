@@ -5,7 +5,7 @@ import pandas as pd
 from elasticsearch import Elasticsearch, RequestsHttpConnection
 from elasticsearch import helpers
 from elasticsearch_dsl import Search, Index
-
+from elasticsearch_dsl import Q, Search
 
 class ElasticsearchService:
     """
@@ -36,8 +36,10 @@ class ElasticsearchService:
         user = kwargs.get('http_auth_username')
         passwd = kwargs.get('http_auth_password')
         api_key = kwargs.get('api_key')
+        ssl_context = kwargs.get('ssl_context')
         with_authent = (user is not None) and (passwd is not None)
         with_api_key = (api_key is not None)
+        with_ssl_context = (ssl_context is not None)
         if kwargs.get('doc_type'):
             self.doc_type = kwargs.get('doc_type')
         else:
@@ -46,11 +48,17 @@ class ElasticsearchService:
             self._logger.info("log with auth")
             self.scheme = kwargs.get('scheme')
             if self.scheme == 'https':
-                self.es = Elasticsearch(hosts=[self.host], port=self.port,
-                                        http_auth=(user, passwd),
-                                        verify_certs=False,
-                                        connection_class=RequestsHttpConnection,
-                                        scheme=self.scheme)
+                if with_ssl_context:
+                    self.es = Elasticsearch(hosts=[self.host], port=self.port,
+                                            http_auth=(user, passwd),
+                                            scheme=self.scheme,
+                                            ssl_context=ssl_context)
+                else:
+                    self.es = Elasticsearch(hosts=[self.host], port=self.port,
+                                            http_auth=(user, passwd),
+                                            verify_certs=False,
+                                            connection_class=RequestsHttpConnection,
+                                            scheme=self.scheme)
             else:
                 self.es = Elasticsearch(hosts=[self.host], port=self.port,
                                         http_auth=(user, passwd),
@@ -66,8 +74,14 @@ class ElasticsearchService:
     def getClient(self):
         return self.es
 
+    def get_client(self):
+        return self.getClient()
+
     def setDoc_type(self, doc_type):
         self.doc_type = doc_type
+
+    def set_doc_type(self, doc_type):
+        self.setDoc_type(doc_type)
 
     def get_mapping(self, index):
         """
@@ -293,3 +307,55 @@ class ElasticsearchService:
 
     def delete_index(self,index_to_delete):
         self.es.indices.delete(index=index_to_delete, ignore=[400, 404])
+        
+    def parallel_import_documents(self, index, documents, **kwargs):
+        """
+        Import documents (array of dict) into elasticsearch index
+        :param index: elasticsearch index (created if doesn't exist)
+        :param documents: array of dict. For updates, each document (dict) must containg a value for key '_id'
+        :return: na
+        """
+        
+        self._logger.info('%s documents to index into %s', len(documents), index)
+        doc_count = 0        
+        
+        if len(documents) > 0:
+            for success, info in helpers.parallel_bulk(self.es, documents,chunk_size=20000, index=index, doc_type="_doc", request_timeout=3600, raise_on_exception=False, raise_on_error=False, **kwargs):
+                if not success:
+                    self._logger.error(f'A document failed: {info}')
+                else:
+                    doc_count += 1
+        
+        self._logger.info('%s documents indexed into %s', doc_count, index)
+        
+        return doc_count        
+
+    def get_documents_with_q(self, index, query=Q(), source=None, add_index_name = False):
+        """
+        Get documents from elasticsearch index
+        :param index: elasticsearch index
+        :param query: es query
+        :param source: extra properties for search
+        :return: dataframe with es data
+        """
+        
+        s = Search(using=self.es, index=index)
+        if source:
+            s = s.source(source)
+        # Dotted fields, replace . by __
+        q = s.query(query)
+        #print(str(q.to_dict()).replace("'",'"'))
+        results = s.query(query).scan()
+        
+        if add_index_name:
+            all_dicts = []
+            for hit in results:
+                result_dict = hit.to_dict()
+                result_dict['_index'] = hit.meta.index
+                all_dicts.append(result_dict)
+                
+            fa = pd.DataFrame.from_dict(all_dicts)
+        else:
+            fa = pd.DataFrame([hit.to_dict() for hit in results])
+        
+        return fa    
