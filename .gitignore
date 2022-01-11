@@ -13,3 +13,7 @@ venv/*
 *.csv
 *.json
 Test*.py
+.project
+.pydevproject
+
+
