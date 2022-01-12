@@ -341,7 +341,7 @@ class ElasticsearchService:
         doc_count = 0        
         
         if len(documents) > 0:
-            for success, info in helpers.parallel_bulk(self.os, documents,chunk_size=chunk_size, index=index, doc_type=doc_type, request_timeout=request_timeout, raise_on_exception=raise_on_exception, raise_on_error=raise_on_error, **kwargs):
+            for success, info in helpers.parallel_bulk(self.es, documents,chunk_size=chunk_size, index=index, doc_type=doc_type, request_timeout=request_timeout, raise_on_exception=raise_on_exception, raise_on_error=raise_on_error, **kwargs):
                 if not success:
                     self._logger.error(f'A document failed: {info}')
                 else:
