@@ -316,11 +316,32 @@ class ElasticsearchService:
         :return: na
         """
         
+        # Set default values in passed as kwargs
+        chunk_size = kwargs.get('chunk_size', None)
+        if chunk_size is None:
+            chunk_size = 20000
+        
+        request_timeout = kwargs.get('request_timeout', None)
+        if request_timeout is None:
+            request_timeout = 3600
+            
+        doc_type = kwargs.get('doc_type', None)
+        if doc_type is None:
+            doc_type = "_doc"
+            
+        raise_on_exception = kwargs.get('raise_on_exception', None)
+        if raise_on_exception is None:
+            raise_on_exception = False
+            
+        raise_on_error = kwargs.get('raise_on_error', None)
+        if raise_on_error is None:
+            raise_on_error = False
+            
         self._logger.info('%s documents to index into %s', len(documents), index)
         doc_count = 0        
         
         if len(documents) > 0:
-            for success, info in helpers.parallel_bulk(self.es, documents,chunk_size=20000, index=index, doc_type="_doc", request_timeout=3600, raise_on_exception=False, raise_on_error=False, **kwargs):
+            for success, info in helpers.parallel_bulk(self.os, documents,chunk_size=chunk_size, index=index, doc_type=doc_type, request_timeout=request_timeout, raise_on_exception=raise_on_exception, raise_on_error=raise_on_error, **kwargs):
                 if not success:
                     self._logger.error(f'A document failed: {info}')
                 else:
@@ -328,8 +349,8 @@ class ElasticsearchService:
         
         self._logger.info('%s documents indexed into %s', doc_count, index)
         
-        return doc_count        
-
+        return doc_count 
+    
     def get_documents_with_q(self, index, query=Q(), source=None, add_index_name = False):
         """
         Get documents from elasticsearch index
